@@ -1,0 +1,16 @@
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Large real data files
+real_data/*.csv
+real_data/*.nc
+
+# macOS
+.DS_Store
+
+# Generated data (regenerate with scripts)
+# data/model.json  ← keep in git (small enough)
+# data/floats.json ← keep in git
