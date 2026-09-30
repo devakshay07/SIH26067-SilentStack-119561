@@ -119,7 +119,8 @@ function valueToColor(value, min, max, variable) {
   }
   let t = (value - min) / (max - min);
   t = Math.max(0, Math.min(1, t)); // clamp
-  const [r, g, b] = interpolateColor(VAR_CONFIG[variable].gradient, t);
+  const config = VAR_CONFIG[variable] || VAR_CONFIG.temperature;
+  const [r, g, b] = interpolateColor(config.gradient, t);
   return new Cesium.Color(r / 255, g / 255, b / 255, state.opacity);
 }
 
@@ -127,6 +128,7 @@ function valueToColor(value, min, max, variable) {
 // LOOP 3 — Render Ocean Model Grid
 // =============================================
 
+let MODEL_CACHE = {}; // Global cache for client-side CSV processing
 let pointPrimitives = null;
 
 const DEPTH_STEPS = [0, 50, 100, 200, 500, 1000];
@@ -144,8 +146,8 @@ async function loadModelField() {
     
     // Merge grids and keep track of individual depths
     let mergedGrid = [];
-    let overallMin = 999;
-    let overallMax = -999;
+    let overallMin = Infinity;
+    let overallMax = -Infinity;
     
     results.forEach((res, idx) => {
       overallMin = Math.min(overallMin, res.min);
@@ -316,7 +318,7 @@ function renderFloatList(floats) {
     item.innerHTML = `
       <div class="float-dot"></div>
       <div>
-        <div class="float-id">${fl.id.replace("ARG_6", "ARG-")}</div>
+        <div class="float-id">${fl.id.replace("ARG_", "")}</div>
         <div class="float-region">${fl.region}</div>
       </div>`;
     item.addEventListener("click", () => selectFloat(fl.id));
@@ -372,7 +374,7 @@ function renderProfile(data) {
   panel.classList.add("visible");
 
   document.getElementById("profile-title").textContent =
-    data.id.replace("ARG_6", "ARG-");
+    data.id.replace("ARG_", "");
   document.getElementById("profile-meta").innerHTML = `
     <strong>Region:</strong> ${data.region}<br>
     <strong>Position:</strong> ${data.lat.toFixed(3)}°N, ${data.lon.toFixed(3)}°E<br>
@@ -549,7 +551,20 @@ document.getElementById("btn-next").addEventListener("click", () => {
   loadModelField();
 });
 
-// Removed auto-play loop as requested. Date navigation is now purely manual.
+// Play/Pause toggle for time animation
+document.getElementById("btn-play").addEventListener("click", () => {
+  if (state.playing) {
+    clearInterval(state.playInterval);
+    state.playing = false;
+  } else {
+    state.playing = true;
+    state.playInterval = setInterval(() => {
+      state.dayIndex = (state.dayIndex + 1) % state.days.length;
+      updateTimeLabel();
+      loadModelField();
+    }, 2000);
+  }
+});
 
 // =============================================
 // Live Navbar Info (Time, Date, Location)
@@ -641,13 +656,13 @@ async function init() {
   await Promise.all([loadModelField(), loadFloats()]);
 
   showLoading(false);
-  document.getElementById("status-badge").textContent = "● LIVE";
+  document.getElementById("status-badge").innerHTML = `<svg width="8" height="8" viewBox="0 0 8 8" style="vertical-align: middle; margin-right: 4px;"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg> LIVE`;
 }
 
 init().catch((err) => {
   console.error("Init failed:", err);
   document.getElementById("loading").innerHTML = `
-    <p style="color:#ff4444">⚠ API unreachable. Start the backend:<br><code>cd backend && python api.py</code></p>`;
+    <p style="color:#ff4444"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> API unreachable. Start the backend:<br><code>cd backend && python api.py</code></p>`;
 });
 
 
@@ -786,13 +801,15 @@ document.getElementById("csv-upload")?.addEventListener("change", function(e) {
       
       // Plot floats on map
       viewer.entities.removeAll(); // Clear old floats
+      floatEntities = {}; // Reset lookup map
       for (const fl of state.floats) {
-        viewer.entities.add({
+        const entity = viewer.entities.add({
           id: fl.id,
           position: Cesium.Cartesian3.fromDegrees(fl.lon, fl.lat, 500),
           point: { pixelSize: 10, color: Cesium.Color.fromCssColorString("#00d4ff"), outlineColor: Cesium.Color.WHITE, outlineWidth: 1.5 },
-          label: { text: fl.id.replace("ARG_", ""), font: "9px Inter", fillColor: Cesium.Color.WHITE, pixelOffset: new Cesium.Cartesian2(12, 0) }
+          label: { text: fl.id.replace("ARG_", ""), font: "9px Inter", fillColor: Cesium.Color.WHITE, pixelOffset: new Cesium.Cartesian2(12, 0), show: false }
         });
+        floatEntities[fl.id] = entity; // Rebuild lookup
       }
 
       // Fly camera to uploaded data bounding box
@@ -819,7 +836,7 @@ document.getElementById("csv-upload")?.addEventListener("change", function(e) {
           points.forEach(p => { min = Math.min(min, p.value); max = Math.max(max, p.value); });
           if(min===999) min=0; if(max===-999) max=1;
           
-          return { json: async () => ({ min, max, grid: points, variable: varName }) };
+          return { json: async () => ({ min, max, grid: points, variable: varName, depth_m: parseInt(depth), day: day, count: points.length }) };
         }
         return originalFetch(url, options);
       };
@@ -837,7 +854,6 @@ document.getElementById("csv-upload")?.addEventListener("change", function(e) {
   });
 });
 
-let MODEL_CACHE = {}; // Global cache for client-side processing
 
 // =============================================
 // Float Search Functionality

@@ -8,6 +8,7 @@ Endpoints:
 """
 
 import json
+import math
 import os
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -73,7 +74,6 @@ def get_model_field(
         raise HTTPException(400, f"Invalid day. Choose from: {VALID_DAYS}")
 
     if var == "currents":
-        import math
         base_grid = MODEL_DATA.get(day, {}).get(str(depth), {}).get("temperature", [])
         grid = []
         for pt in base_grid:
