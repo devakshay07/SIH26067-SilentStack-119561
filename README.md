@@ -10,7 +10,25 @@ A browser-native, interactive **3D ocean data visualization platform** that co-r
 
 ---
 
-## Live Demo
+## 🌍 Live Demo (Vercel)
+
+**[👉 Launch Interactive 3D Platform](https://silentstack119561.vercel.app)**  
+*(Optimized for Chrome/Edge on Desktop. Deployed serverless on Vercel).*
+
+### Application Gallery
+
+![3D Isosurface Volume](frontend/assets/screenshot_isosurface.png)
+*Volumetric 3D Isosurface extracting deep ocean structures.*
+
+![Depth Profile Analytics](frontend/assets/screenshot_profile.png)
+*Interactive depth profile analysis for individual Argo floats.*
+
+![Interactive Globe](frontend/assets/screenshot_perspective.png)
+*Smooth 3D perspective camera over the Indian Ocean EEZ.*
+
+---
+
+## Local Development (Optional)
 
 ```bash
 cd backend
